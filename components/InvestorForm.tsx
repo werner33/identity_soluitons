@@ -12,8 +12,17 @@ import {
   CircularProgress,
   MenuItem,
   InputAdornment,
+  Backdrop,
+  Zoom,
 } from '@mui/material';
-import { Person, Phone, Home, Upload, CheckCircle } from '@mui/icons-material';
+import {
+  Person,
+  Phone,
+  Home,
+  Upload,
+  CheckCircle,
+  Refresh,
+} from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -118,18 +127,25 @@ const investorSchema = z.object({
       return zipNum >= 501 && zipNum <= 99950;
     }, 'Invalid US ZIP code'),
   file: z
-    .instanceof(FileList)
-    .refine((files) => files.length > 0, 'Document is required')
+    .any()
+    .refine((files) => files instanceof FileList && files.length > 0, {
+      message: 'Document is required',
+    })
     .refine(
-      (files) => files[0]?.size <= 3 * 1024 * 1024,
-      'File size must be less than 3MB'
+      (files) => files instanceof FileList && files[0]?.size <= 3 * 1024 * 1024,
+      {
+        message: 'File size must be less than 3MB',
+      }
     )
     .refine(
       (files) =>
+        files instanceof FileList &&
         ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'].includes(
           files[0]?.type
         ),
-      'Only PDF, JPG, and PNG files are allowed'
+      {
+        message: 'Only PDF, JPG, and PNG files are allowed',
+      }
     ),
 });
 
@@ -164,6 +180,8 @@ export default function InvestorForm() {
     setSubmitError(null);
     setSubmitSuccess(false);
 
+    const startTime = Date.now();
+
     try {
       const formData = new FormData();
       formData.append('firstName', data.firstName);
@@ -185,11 +203,18 @@ export default function InvestorForm() {
         throw new Error(error.error || 'Failed to submit form');
       }
 
+      // Ensure minimum 400ms loading time
+      const elapsed = Date.now() - startTime;
+      const remainingTime = Math.max(0, 400 - elapsed);
+
+      await new Promise((resolve) => setTimeout(resolve, remainingTime));
+
       setSubmitSuccess(true);
       reset();
       setSelectedFileName('');
 
-      setTimeout(() => setSubmitSuccess(false), 5000);
+      // Scroll to top smoothly
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : 'An unexpected error occurred'
@@ -199,282 +224,439 @@ export default function InvestorForm() {
     }
   };
 
-  return (
-    <Paper elevation={3} sx={{ p: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Investor Information Form
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Please provide your information below. All fields are required.
-        </Typography>
-      </Box>
+  const handleStartOver = () => {
+    setSubmitSuccess(false);
+    setSubmitError(null);
+    reset();
+    setSelectedFileName('');
+  };
 
-      {submitSuccess && (
-        <Alert severity="success" sx={{ mb: 3 }} icon={<CheckCircle />}>
-          Investor information submitted successfully!
-        </Alert>
-      )}
-
-      {submitError && (
-        <Alert
-          severity="error"
-          sx={{ mb: 3 }}
-          onClose={() => setSubmitError(null)}
+  // Success View
+  if (submitSuccess) {
+    return (
+      <Zoom in={submitSuccess}>
+        <Paper
+          elevation={3}
+          sx={{
+            p: 6,
+            textAlign: 'center',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+          }}
         >
-          {submitError}
-        </Alert>
-      )}
-
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <Stack spacing={3}>
-          {/* Personal Information Section */}
-          <Typography
-            variant="h6"
-            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-          >
-            <Person /> Personal Information
-          </Typography>
-
           <Box
             sx={{
-              display: 'grid',
-              gap: 2,
-              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+              position: 'relative',
+              display: 'inline-block',
+              mb: 3,
             }}
           >
-            <Controller
-              name="firstName"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  label="First Name"
-                  fullWidth
-                  required
-                  error={!!errors.firstName}
-                  helperText={errors.firstName?.message}
-                  disabled={isSubmitting}
-                />
-              )}
-            />
-
-            <Controller
-              name="lastName"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  label="Last Name"
-                  fullWidth
-                  required
-                  error={!!errors.lastName}
-                  helperText={errors.lastName?.message}
-                  disabled={isSubmitting}
-                />
-              )}
-            />
-
-            <Controller
-              name="dateOfBirth"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  label="Date of Birth"
-                  type="date"
-                  fullWidth
-                  required
-                  InputLabelProps={{ shrink: true }}
-                  error={!!errors.dateOfBirth}
-                  helperText={errors.dateOfBirth?.message}
-                  disabled={isSubmitting}
-                />
-              )}
-            />
-
-            <Controller
-              name="phoneNumber"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  label="Phone Number"
-                  fullWidth
-                  required
-                  placeholder="1-951-526-3834"
-                  error={!!errors.phoneNumber}
-                  helperText={
-                    errors.phoneNumber?.message ||
-                    'US/Canada format: 1-951-526-3834 or (951) 526-3834'
-                  }
-                  disabled={isSubmitting}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Phone />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              )}
-            />
-          </Box>
-
-          {/* Address Section */}
-          <Typography
-            variant="h6"
-            sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}
-          >
-            <Home /> Address Information
-          </Typography>
-
-          <Controller
-            name="streetAddress"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                label="Street Address"
-                fullWidth
-                required
-                error={!!errors.streetAddress}
-                helperText={errors.streetAddress?.message}
-                disabled={isSubmitting}
+            <Box
+              sx={{
+                width: 120,
+                height: 120,
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                animation: 'pulse 2s infinite',
+                '@keyframes pulse': {
+                  '0%': {
+                    transform: 'scale(1)',
+                    boxShadow: '0 0 0 0 rgba(255, 255, 255, 0.7)',
+                  },
+                  '50%': {
+                    transform: 'scale(1.05)',
+                    boxShadow: '0 0 0 20px rgba(255, 255, 255, 0)',
+                  },
+                  '100%': {
+                    transform: 'scale(1)',
+                    boxShadow: '0 0 0 0 rgba(255, 255, 255, 0)',
+                  },
+                },
+              }}
+            >
+              <CheckCircle
+                sx={{
+                  fontSize: 80,
+                  animation: 'checkmark 0.5s ease-in-out',
+                  '@keyframes checkmark': {
+                    '0%': {
+                      transform: 'scale(0) rotate(0deg)',
+                      opacity: 0,
+                    },
+                    '50%': {
+                      transform: 'scale(1.2) rotate(180deg)',
+                    },
+                    '100%': {
+                      transform: 'scale(1) rotate(360deg)',
+                      opacity: 1,
+                    },
+                  },
+                }}
               />
-            )}
-          />
+            </Box>
+          </Box>
+
+          <Typography
+            variant="h3"
+            component="h1"
+            gutterBottom
+            fontWeight="bold"
+          >
+            Success!
+          </Typography>
+
+          <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
+            Your investor information has been submitted successfully.
+          </Typography>
 
           <Box
             sx={{
-              display: 'grid',
-              gap: 2,
-              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: 2,
+              p: 3,
+              mb: 4,
             }}
           >
-            <Controller
-              name="state"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  select
-                  label="State"
-                  fullWidth
-                  required
-                  error={!!errors.state}
-                  helperText={errors.state?.message}
-                  disabled={isSubmitting}
-                >
-                  <MenuItem value="">
-                    <em>Select a state</em>
-                  </MenuItem>
-                  {US_STATES.map((state) => (
-                    <MenuItem key={state.value} value={state.value}>
-                      {state.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              )}
-            />
-
-            <Controller
-              name="zipCode"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  label="ZIP Code"
-                  fullWidth
-                  required
-                  placeholder="12345"
-                  error={!!errors.zipCode}
-                  helperText={
-                    errors.zipCode?.message || 'US ZIP: 12345 or 12345-6789'
-                  }
-                  disabled={isSubmitting}
-                  inputProps={{ maxLength: 10 }}
-                />
-              )}
-            />
+            <Typography variant="body1" sx={{ mb: 1 }}>
+              ✓ Personal information saved
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 1 }}>
+              ✓ Address details recorded
+            </Typography>
+            <Typography variant="body1">
+              ✓ Document uploaded securely
+            </Typography>
           </Box>
 
-          {/* Document Upload Section */}
-          <Typography
-            variant="h6"
-            sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}
-          >
-            <Upload /> Document Upload
-          </Typography>
-
-          <Controller
-            name="file"
-            control={control}
-            render={({ field: { onChange, value, ...field } }) => (
-              <Box>
-                <Button
-                  variant="outlined"
-                  component="label"
-                  fullWidth
-                  startIcon={<Upload />}
-                  disabled={isSubmitting}
-                  sx={{ p: 2 }}
-                >
-                  {selectedFileName ||
-                    'Upload ID Document (PDF, JPG, PNG - Max 3MB)'}
-                  <input
-                    {...field}
-                    type="file"
-                    hidden
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      onChange(e.target.files);
-                      setSelectedFileName(e.target.files?.[0]?.name || '');
-                    }}
-                  />
-                </Button>
-                {errors.file && (
-                  <Typography
-                    variant="caption"
-                    color="error"
-                    sx={{ mt: 1, display: 'block' }}
-                  >
-                    {errors.file.message}
-                  </Typography>
-                )}
-                {selectedFileName && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 1 }}
-                  >
-                    Selected: {selectedFileName}
-                  </Typography>
-                )}
-              </Box>
-            )}
-          />
-
-          {/* Submit Button */}
           <Button
-            type="submit"
             variant="contained"
             size="large"
-            fullWidth
-            disabled={isSubmitting}
-            sx={{ mt: 2, py: 1.5 }}
+            startIcon={<Refresh />}
+            onClick={handleStartOver}
+            sx={{
+              bgcolor: 'white',
+              color: '#667eea',
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.9)',
+              },
+              px: 4,
+              py: 1.5,
+              fontWeight: 'bold',
+            }}
           >
-            {isSubmitting ? (
-              <>
-                <CircularProgress size={24} sx={{ mr: 1 }} />
-                Submitting...
-              </>
-            ) : (
-              'Submit Information'
-            )}
+            Submit Another Entry
           </Button>
-        </Stack>
-      </form>
-    </Paper>
+        </Paper>
+      </Zoom>
+    );
+  }
+
+  return (
+    <>
+      {/* Loading Overlay */}
+      <Backdrop
+        sx={{
+          color: '#fff',
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          background: 'rgba(0, 0, 0, 0.8)',
+          position: 'absolute',
+          borderRadius: 2,
+        }}
+        open={isSubmitting}
+      >
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress
+            size={60}
+            thickness={4}
+            sx={{
+              color: '#667eea',
+              mb: 2,
+            }}
+          />
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            Submitting Your Information...
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1, opacity: 0.8 }}>
+            Please wait while we process your data
+          </Typography>
+        </Box>
+      </Backdrop>
+
+      <Paper elevation={3} sx={{ p: 4, position: 'relative' }}>
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Investor Information Form
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Please provide your information below. All fields are required.
+          </Typography>
+        </Box>
+
+        {submitError && (
+          <Alert
+            severity="error"
+            sx={{ mb: 3 }}
+            onClose={() => setSubmitError(null)}
+          >
+            {submitError}
+          </Alert>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <Stack spacing={3}>
+            {/* Personal Information Section */}
+            <Typography
+              variant="h6"
+              sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+            >
+              <Person /> Personal Information
+            </Typography>
+
+            <Box
+              sx={{
+                display: 'grid',
+                gap: 2,
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+              }}
+            >
+              <Controller
+                name="firstName"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="First Name"
+                    fullWidth
+                    required
+                    error={!!errors.firstName}
+                    helperText={errors.firstName?.message}
+                    disabled={isSubmitting}
+                  />
+                )}
+              />
+
+              <Controller
+                name="lastName"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Last Name"
+                    fullWidth
+                    required
+                    error={!!errors.lastName}
+                    helperText={errors.lastName?.message}
+                    disabled={isSubmitting}
+                  />
+                )}
+              />
+
+              <Controller
+                name="dateOfBirth"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Date of Birth"
+                    type="date"
+                    fullWidth
+                    required
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    error={!!errors.dateOfBirth}
+                    helperText={errors.dateOfBirth?.message}
+                    disabled={isSubmitting}
+                  />
+                )}
+              />
+
+              <Controller
+                name="phoneNumber"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Phone Number"
+                    fullWidth
+                    required
+                    placeholder="1-951-526-3834"
+                    error={!!errors.phoneNumber}
+                    helperText={
+                      errors.phoneNumber?.message ||
+                      'US/Canada format: 1-951-526-3834 or (951) 526-3834'
+                    }
+                    disabled={isSubmitting}
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Phone />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                  />
+                )}
+              />
+            </Box>
+
+            {/* Address Section */}
+            <Typography
+              variant="h6"
+              sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}
+            >
+              <Home /> Address Information
+            </Typography>
+
+            <Controller
+              name="streetAddress"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  label="Street Address"
+                  fullWidth
+                  required
+                  error={!!errors.streetAddress}
+                  helperText={errors.streetAddress?.message}
+                  disabled={isSubmitting}
+                />
+              )}
+            />
+
+            <Box
+              sx={{
+                display: 'grid',
+                gap: 2,
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+              }}
+            >
+              <Controller
+                name="state"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    select
+                    label="State"
+                    fullWidth
+                    required
+                    error={!!errors.state}
+                    helperText={errors.state?.message}
+                    disabled={isSubmitting}
+                  >
+                    <MenuItem value="">
+                      <em>Select a state</em>
+                    </MenuItem>
+                    {US_STATES.map((state) => (
+                      <MenuItem key={state.value} value={state.value}>
+                        {state.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              />
+
+              <Controller
+                name="zipCode"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="ZIP Code"
+                    fullWidth
+                    required
+                    placeholder="12345"
+                    error={!!errors.zipCode}
+                    helperText={
+                      errors.zipCode?.message || 'US ZIP: 12345 or 12345-6789'
+                    }
+                    disabled={isSubmitting}
+                    slotProps={{ htmlInput: { maxLength: 10 } }}
+                  />
+                )}
+              />
+            </Box>
+
+            {/* Document Upload Section */}
+            <Typography
+              variant="h6"
+              sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}
+            >
+              <Upload /> Document Upload
+            </Typography>
+
+            <Controller
+              name="file"
+              control={control}
+              render={({ field: { onChange, value, ...field } }) => (
+                <Box>
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    fullWidth
+                    startIcon={<Upload />}
+                    disabled={isSubmitting}
+                    sx={{ p: 2 }}
+                  >
+                    {selectedFileName ||
+                      'Upload ID Document (PDF, JPG, PNG - Max 3MB)'}
+                    <input
+                      {...field}
+                      type="file"
+                      hidden
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        onChange(e.target.files);
+                        setSelectedFileName(e.target.files?.[0]?.name || '');
+                      }}
+                    />
+                  </Button>
+                  {errors.file && (
+                    <Typography
+                      variant="caption"
+                      color="error"
+                      sx={{ mt: 1, display: 'block' }}
+                    >
+                      {String(errors.file.message)}
+                    </Typography>
+                  )}
+                  {selectedFileName && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 1 }}
+                    >
+                      Selected: {selectedFileName}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            />
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              variant="contained"
+              size="large"
+              fullWidth
+              disabled={isSubmitting}
+              sx={{ mt: 2, py: 1.5 }}
+            >
+              {isSubmitting ? (
+                <>
+                  <CircularProgress size={24} sx={{ mr: 1 }} />
+                  Submitting...
+                </>
+              ) : (
+                'Submit Information'
+              )}
+            </Button>
+          </Stack>
+        </form>
+      </Paper>
+    </>
   );
 }
