@@ -1,0 +1,10 @@
+# Prisma generated files
+/generated
+
+# Migration lock file (optional - include if you want consistent migrations)
+# Uncomment the line below if you want to version control the migration lock
+# !migrations/migration_lock.toml
+
+# Development database file (SQLite only)
+*.db
+*.db-journal
