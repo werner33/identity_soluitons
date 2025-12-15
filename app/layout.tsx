@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { AppBar, Toolbar, Typography, Box, Container } from '@mui/material';
+import { Business } from '@mui/icons-material';
 import './globals.css';
 
 const inter = Inter({
@@ -24,23 +26,45 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="antialiased min-h-screen bg-background text-foreground">
-        <div className="flex flex-col min-h-screen">
-          <header className="border-b border-border bg-white sticky top-0 z-50">
-            <div className="container mx-auto px-4 py-4">
-              <h1 className="text-2xl font-bold text-primary">
-                Investor Information System
-              </h1>
-            </div>
-          </header>
-          <main className="flex-1 container mx-auto px-4 py-8">{children}</main>
-          <footer className="border-t border-border bg-gray-50 py-6">
-            <div className="container mx-auto px-4 text-center text-sm text-secondary">
-              &copy; {new Date().getFullYear()} Investor Information Management
-              System. All rights reserved.
-            </div>
-          </footer>
-        </div>
+      <body className="antialiased min-h-screen">
+        <Box
+          sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}
+        >
+          <AppBar position="static" elevation={1} sx={{ bgcolor: '#1e40af' }}>
+            <Container maxWidth="lg">
+              <Toolbar disableGutters>
+                <Business sx={{ mr: 2 }} />
+                <Typography
+                  variant="h6"
+                  component="div"
+                  sx={{ flexGrow: 1, fontWeight: 600 }}
+                >
+                  Investor Information System
+                </Typography>
+              </Toolbar>
+            </Container>
+          </AppBar>
+          <Box component="main" sx={{ flexGrow: 1, bgcolor: '#f8fafc' }}>
+            {children}
+          </Box>
+          <Box
+            component="footer"
+            sx={{
+              py: 3,
+              px: 2,
+              mt: 'auto',
+              bgcolor: '#f1f5f9',
+              borderTop: '1px solid #e2e8f0',
+            }}
+          >
+            <Container maxWidth="lg">
+              <Typography variant="body2" color="text.secondary" align="center">
+                &copy; {new Date().getFullYear()} Investor Information
+                Management System. All rights reserved.
+              </Typography>
+            </Container>
+          </Box>
+        </Box>
       </body>
     </html>
   );
