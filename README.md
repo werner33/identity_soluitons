@@ -1,19 +1,19 @@
 # Investor Information Management System
 
-Hey! 👋
+Hey!
 
 Started this on Sunday but honestly was super tired from a long week, so I picked it up Monday after work and got it to a good place.
 
-It's a Next.js app for collecting and managing investor information with file uploads. Here's what I built:
+It's a Next.js app collecting investor information. Each investor can upload 1 or more files with a max siz of 3mb. Here's the main points:
 
 ## What It Does
 
 **Front End:**
-- Clean Material UI form with first name, last name, birthday, phone number, street address, state, zip code, and **multiple file uploader**
-- Full validation on everything - phone must be valid US/Canada format, validates US zip codes, checks required fields, age restrictions (18-120), etc.
-- Fully responsive design that works on mobile, tablet, and desktop
+- Material UI form with first name, last name, birthday, phone number, street address, state, zip code, and **multiple file uploader**
+- Validations - phone must be valid US/Canada format, validates US zip codes, checks required fields, age restrictions (18-120).
+- Responsive design that works on mobile, tablet, and desktop
 - Success toast notifications when you save data
-- Shows a list of files you're uploading with remove buttons
+- Shows a list of files, with file size and remove buttons
 
 **Back End:**
 - Same validations as the front end so there's no way to bypass and save invalid data
