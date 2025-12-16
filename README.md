@@ -4,12 +4,24 @@ Hey!
 
 Started this on Sunday but honestly was super tired from a long week, so I picked it up Monday after work and got it to a good place.
 
+Edit - Made some more changes at 11pm :) Not enough modularity in the code, couldn't sleep, wanted to organize it better. 
+
+Main files to check out: 
+
+FE UI: InvestorForm.tsx
+FE Validations: form-validation.ts
+File uploading: file-upload.ts
+API: api/routes
+API Validations: lib/investor-validation.ts
+DB: evolution of data model prisma/migrations
+Uploaded files are stored in the Uploads directory and are ignored by git. 
+
 It's a Next.js app collecting investor information. Each investor can upload 1 or more files with a max siz of 3mb. Here's the main points:
 
 ## What It Does
 
 **Front End:**
-- Material UI form with first name, last name, birthday, phone number, street address, state, zip code, and **multiple file uploader**
+- Material UI form with first name, last name, birthday, phone number, street address, state, zip code, and multiple file uploader
 - Validations - phone must be valid US/Canada format, validates US zip codes, checks required fields, age restrictions (18-120).
 - Responsive design that works on mobile, tablet, and desktop
 - Success toast notifications when you save data
