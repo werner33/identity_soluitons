@@ -8,13 +8,13 @@ Edit - Made some more changes at 11pm :) Not enough modularity in the code, coul
 
 Main files to check out: 
 
-FE UI: InvestorForm.tsx \n
-FE Validations: form-validation.ts
-File uploading: file-upload.ts
-API: api/routes
-API Validations: lib/investor-validation.ts
-DB: evolution of data model prisma/migrations
-Uploaded files are stored in the Uploads directory and are ignored by git. 
+FE UI: InvestorForm.tsx  
+FE Validations: form-validation.ts  
+File uploading: file-upload.ts  
+API: api/routes  
+API Validations: lib/investor-validation.ts  
+DB: evolution of data model prisma/migrations  
+Uploaded files are stored in the Uploads directory and are ignored by git.   
 
 It's a Next.js app collecting investor information. Each investor can upload 1 or more files with a max siz of 3mb. Here's the main points:
 
