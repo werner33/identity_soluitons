@@ -8,7 +8,7 @@ Edit - Made some more changes at 11pm :) Not enough modularity in the code, coul
 
 Main files to check out: 
 
-FE UI: InvestorForm.tsx
+FE UI: InvestorForm.tsx \n
 FE Validations: form-validation.ts
 File uploading: file-upload.ts
 API: api/routes
