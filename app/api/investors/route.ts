@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const streetAddress = formData.get('streetAddress') as string;
     const state = formData.get('state') as string;
     const zipCode = formData.get('zipCode') as string;
-    const file = formData.get('file') as File;
+    const files = formData.getAll('files') as File[];
 
     // Validate required fields
     if (
@@ -26,8 +26,7 @@ export async function POST(request: NextRequest) {
       !phoneNumber ||
       !streetAddress ||
       !state ||
-      !zipCode ||
-      !file
+      !zipCode
     ) {
       return NextResponse.json(
         { error: 'All fields are required' },
@@ -35,26 +34,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file
-    const maxSize = parseInt(process.env.MAX_FILE_SIZE || '3145728', 10);
-    if (file.size > maxSize) {
+    // Validate at least one file
+    if (!files || files.length === 0) {
       return NextResponse.json(
-        { error: 'File size exceeds maximum allowed size (3MB)' },
+        { error: 'At least one file is required' },
         { status: 400 }
       );
     }
 
+    // Validate all files
+    const maxSize = parseInt(process.env.MAX_FILE_SIZE || '3145728', 10);
     const allowedTypes = [
       'application/pdf',
       'image/jpeg',
       'image/jpg',
       'image/png',
     ];
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: 'Invalid file type. Only PDF, JPG, and PNG are allowed' },
-        { status: 400 }
-      );
+
+    for (const file of files) {
+      if (file.size > maxSize) {
+        return NextResponse.json(
+          {
+            error: `File "${file.name}" exceeds maximum allowed size (3MB)`,
+          },
+          { status: 400 }
+        );
+      }
+
+      if (!allowedTypes.includes(file.type)) {
+        return NextResponse.json(
+          {
+            error: `File "${file.name}" has invalid type. Only PDF, JPG, and PNG are allowed`,
+          },
+          { status: 400 }
+        );
+      }
+
+      // Check filename length (database limit is 255 chars)
+      if (file.name.length > 255) {
+        return NextResponse.json(
+          {
+            error: `File name "${file.name}" is too long. Maximum 255 characters allowed.`,
+          },
+          { status: 400 }
+        );
+      }
+
+      // Check mime type length (database limit is 100 chars)
+      if (file.type.length > 100) {
+        return NextResponse.json(
+          {
+            error: `File "${file.name}" has an invalid mime type.`,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Create upload directory if it doesn't exist
@@ -67,18 +101,53 @@ export async function POST(request: NextRequest) {
       console.error('Failed to create upload directory:', error);
     }
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const fileName = `${timestamp}-${sanitizedFileName}`;
-    const filePath = join(uploadPath, fileName);
+    // Prepare file data for saving
+    const fileDataArray = [];
+    for (const file of files) {
+      const timestamp = Date.now();
+      const randomSuffix = Math.random().toString(36).substring(2, 8);
+      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const fileName = `${timestamp}-${randomSuffix}-${sanitizedFileName}`;
+      const filePath = join(uploadPath, fileName);
+      const dbFilePath = `${uploadDir}/${fileName}`;
 
-    // Save file
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
+      // Validate file path length (database limit is 500 chars)
+      if (dbFilePath.length > 500) {
+        return NextResponse.json(
+          {
+            error: `File name "${file.name}" results in a path that is too long. Please use a shorter filename.`,
+          },
+          { status: 400 }
+        );
+      }
 
-    // Save to database
+      // Save file
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      await writeFile(filePath, buffer);
+
+      fileDataArray.push({
+        filePath: dbFilePath,
+        fileOriginalName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+      });
+    }
+
+    // Debug logging
+    console.log('File data array:', JSON.stringify(fileDataArray, null, 2));
+    console.log('Creating investor with data:', {
+      firstName,
+      lastName,
+      dateOfBirth,
+      phoneNumber,
+      streetAddress,
+      state,
+      zipCode,
+      fileCount: fileDataArray.length,
+    });
+
+    // Save to database with files
     const investor = await db.investor.create({
       data: {
         firstName,
@@ -88,8 +157,12 @@ export async function POST(request: NextRequest) {
         streetAddress,
         state,
         zipCode,
-        filePath: `${uploadDir}/${fileName}`,
-        fileOriginalName: file.name,
+        files: {
+          create: fileDataArray,
+        },
+      },
+      include: {
+        files: true,
       },
     });
 
@@ -101,12 +174,14 @@ export async function POST(request: NextRequest) {
           firstName: investor.firstName,
           lastName: investor.lastName,
           createdAt: investor.createdAt,
+          filesCount: investor.files.length,
         },
       },
       { status: 201 }
     );
   } catch (error) {
     console.error('Error creating investor:', error);
+    console.error('Full error details:', JSON.stringify(error, null, 2));
 
     const dbError = parsePrismaError(error);
 

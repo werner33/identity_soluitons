@@ -13,7 +13,7 @@ import {
   MenuItem,
   InputAdornment,
   Backdrop,
-  Zoom,
+  Snackbar,
 } from '@mui/material';
 import {
   Person,
@@ -21,7 +21,6 @@ import {
   Home,
   Upload,
   CheckCircle,
-  Refresh,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -126,23 +125,37 @@ const investorSchema = z.object({
       // Valid US ZIP codes range from 00501 to 99950
       return zipNum >= 501 && zipNum <= 99950;
     }, 'Invalid US ZIP code'),
-  file: z
+  files: z
     .any()
     .refine((files) => files instanceof FileList && files.length > 0, {
-      message: 'Document is required',
+      message: 'At least one document is required',
     })
     .refine(
-      (files) => files instanceof FileList && files[0]?.size <= 3 * 1024 * 1024,
+      (files) => {
+        if (!(files instanceof FileList)) return false;
+        for (let i = 0; i < files.length; i++) {
+          if (files[i].size > 3 * 1024 * 1024) return false;
+        }
+        return true;
+      },
       {
-        message: 'File size must be less than 3MB',
+        message: 'Each file must be less than 3MB',
       }
     )
     .refine(
-      (files) =>
-        files instanceof FileList &&
-        ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'].includes(
-          files[0]?.type
-        ),
+      (files) => {
+        if (!(files instanceof FileList)) return false;
+        const allowedTypes = [
+          'application/pdf',
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+        ];
+        for (let i = 0; i < files.length; i++) {
+          if (!allowedTypes.includes(files[i].type)) return false;
+        }
+        return true;
+      },
       {
         message: 'Only PDF, JPG, and PNG files are allowed',
       }
@@ -155,7 +168,7 @@ export default function InvestorForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [selectedFileName, setSelectedFileName] = useState<string>('');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const {
     control,
@@ -191,7 +204,11 @@ export default function InvestorForm() {
       formData.append('streetAddress', data.streetAddress);
       formData.append('state', data.state);
       formData.append('zipCode', data.zipCode);
-      formData.append('file', data.file[0]);
+
+      // Append all files
+      for (let i = 0; i < data.files.length; i++) {
+        formData.append('files', data.files[i]);
+      }
 
       const response = await fetch('/api/investors', {
         method: 'POST',
@@ -211,7 +228,7 @@ export default function InvestorForm() {
 
       setSubmitSuccess(true);
       reset();
-      setSelectedFileName('');
+      setSelectedFiles([]);
 
       // Scroll to top smoothly
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -219,143 +236,41 @@ export default function InvestorForm() {
       setSubmitError(
         error instanceof Error ? error.message : 'An unexpected error occurred'
       );
+      // Scroll to top to show error message
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleStartOver = () => {
+  const handleCloseSnackbar = () => {
     setSubmitSuccess(false);
-    setSubmitError(null);
-    reset();
-    setSelectedFileName('');
   };
-
-  // Success View
-  if (submitSuccess) {
-    return (
-      <Zoom in={submitSuccess}>
-        <Paper
-          elevation={3}
-          sx={{
-            p: 6,
-            textAlign: 'center',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-          }}
-        >
-          <Box
-            sx={{
-              position: 'relative',
-              display: 'inline-block',
-              mb: 3,
-            }}
-          >
-            <Box
-              sx={{
-                width: 120,
-                height: 120,
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                animation: 'pulse 2s infinite',
-                '@keyframes pulse': {
-                  '0%': {
-                    transform: 'scale(1)',
-                    boxShadow: '0 0 0 0 rgba(255, 255, 255, 0.7)',
-                  },
-                  '50%': {
-                    transform: 'scale(1.05)',
-                    boxShadow: '0 0 0 20px rgba(255, 255, 255, 0)',
-                  },
-                  '100%': {
-                    transform: 'scale(1)',
-                    boxShadow: '0 0 0 0 rgba(255, 255, 255, 0)',
-                  },
-                },
-              }}
-            >
-              <CheckCircle
-                sx={{
-                  fontSize: 80,
-                  animation: 'checkmark 0.5s ease-in-out',
-                  '@keyframes checkmark': {
-                    '0%': {
-                      transform: 'scale(0) rotate(0deg)',
-                      opacity: 0,
-                    },
-                    '50%': {
-                      transform: 'scale(1.2) rotate(180deg)',
-                    },
-                    '100%': {
-                      transform: 'scale(1) rotate(360deg)',
-                      opacity: 1,
-                    },
-                  },
-                }}
-              />
-            </Box>
-          </Box>
-
-          <Typography
-            variant="h3"
-            component="h1"
-            gutterBottom
-            fontWeight="bold"
-          >
-            Success!
-          </Typography>
-
-          <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
-            Your investor information has been submitted successfully.
-          </Typography>
-
-          <Box
-            sx={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: 2,
-              p: 3,
-              mb: 4,
-            }}
-          >
-            <Typography variant="body1" sx={{ mb: 1 }}>
-              ✓ Personal information saved
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 1 }}>
-              ✓ Address details recorded
-            </Typography>
-            <Typography variant="body1">
-              ✓ Document uploaded securely
-            </Typography>
-          </Box>
-
-          <Button
-            variant="contained"
-            size="large"
-            startIcon={<Refresh />}
-            onClick={handleStartOver}
-            sx={{
-              bgcolor: 'white',
-              color: '#667eea',
-              '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.9)',
-              },
-              px: 4,
-              py: 1.5,
-              fontWeight: 'bold',
-            }}
-          >
-            Submit Another Entry
-          </Button>
-        </Paper>
-      </Zoom>
-    );
-  }
 
   return (
     <>
+      {/* Success Toast */}
+      <Snackbar
+        open={submitSuccess}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity="success"
+          variant="filled"
+          icon={<CheckCircle />}
+          sx={{
+            width: '100%',
+            fontSize: '1rem',
+            alignItems: 'center',
+          }}
+        >
+          Investor information submitted successfully!
+        </Alert>
+      </Snackbar>
+
       {/* Loading Overlay */}
       <Backdrop
         sx={{
@@ -589,7 +504,7 @@ export default function InvestorForm() {
             </Typography>
 
             <Controller
-              name="file"
+              name="files"
               control={control}
               render={({ field: { onChange, value, ...field } }) => (
                 <Box>
@@ -601,36 +516,90 @@ export default function InvestorForm() {
                     disabled={isSubmitting}
                     sx={{ p: 2 }}
                   >
-                    {selectedFileName ||
-                      'Upload ID Document (PDF, JPG, PNG - Max 3MB)'}
+                    {selectedFiles.length === 0
+                      ? 'Upload Documents (PDF, JPG, PNG - Max 3MB each)'
+                      : `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`}
                     <input
                       {...field}
                       type="file"
                       hidden
+                      multiple
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(e) => {
                         onChange(e.target.files);
-                        setSelectedFileName(e.target.files?.[0]?.name || '');
+                        if (e.target.files) {
+                          setSelectedFiles(Array.from(e.target.files));
+                        }
                       }}
                     />
                   </Button>
-                  {errors.file && (
+                  {errors.files && (
                     <Typography
                       variant="caption"
                       color="error"
                       sx={{ mt: 1, display: 'block' }}
                     >
-                      {String(errors.file.message)}
+                      {String(errors.files.message)}
                     </Typography>
                   )}
-                  {selectedFileName && (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 1 }}
-                    >
-                      Selected: {selectedFileName}
-                    </Typography>
+                  {selectedFiles.length > 0 && (
+                    <Box sx={{ mt: 2 }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 1, fontWeight: 600 }}
+                      >
+                        Selected Files:
+                      </Typography>
+                      <Stack spacing={1}>
+                        {selectedFiles.map((file, index) => (
+                          <Box
+                            key={index}
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              p: 1.5,
+                              bgcolor: 'background.paper',
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              borderRadius: 1,
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <CheckCircle color="success" fontSize="small" />
+                              <Box>
+                                <Typography variant="body2">
+                                  {file.name}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                                </Typography>
+                              </Box>
+                            </Box>
+                            <Button
+                              size="small"
+                              color="error"
+                              onClick={() => {
+                                const newFiles = selectedFiles.filter(
+                                  (_, i) => i !== index
+                                );
+                                setSelectedFiles(newFiles);
+                                const dt = new DataTransfer();
+                                newFiles.forEach((f) => dt.items.add(f));
+                                onChange(dt.files);
+                              }}
+                              disabled={isSubmitting}
+                            >
+                              Remove
+                            </Button>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Box>
                   )}
                 </Box>
               )}

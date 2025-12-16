@@ -31,8 +31,20 @@ const sampleInvestors = [
     streetAddress: '123 Oak Street',
     state: 'CA',
     zipCode: '90210',
-    filePath: '/uploads/sample/john-smith-id.pdf',
-    fileOriginalName: 'drivers-license.pdf',
+    files: [
+      {
+        filePath: '/uploads/sample/john-smith-id.pdf',
+        fileOriginalName: 'drivers-license.pdf',
+        fileSize: 245760,
+        mimeType: 'application/pdf',
+      },
+      {
+        filePath: '/uploads/sample/john-smith-proof.jpg',
+        fileOriginalName: 'proof-of-address.jpg',
+        fileSize: 512000,
+        mimeType: 'image/jpeg',
+      },
+    ],
   },
   {
     firstName: 'Sarah',
@@ -42,8 +54,14 @@ const sampleInvestors = [
     streetAddress: '456 Maple Avenue',
     state: 'NY',
     zipCode: '10001',
-    filePath: '/uploads/sample/sarah-johnson-id.pdf',
-    fileOriginalName: 'passport.pdf',
+    files: [
+      {
+        filePath: '/uploads/sample/sarah-johnson-id.pdf',
+        fileOriginalName: 'passport.pdf',
+        fileSize: 389120,
+        mimeType: 'application/pdf',
+      },
+    ],
   },
   {
     firstName: 'Michael',
@@ -53,8 +71,14 @@ const sampleInvestors = [
     streetAddress: '789 Pine Boulevard',
     state: 'TX',
     zipCode: '75001',
-    filePath: '/uploads/sample/michael-chen-id.pdf',
-    fileOriginalName: 'state-id.pdf',
+    files: [
+      {
+        filePath: '/uploads/sample/michael-chen-id.pdf',
+        fileOriginalName: 'state-id.pdf',
+        fileSize: 301056,
+        mimeType: 'application/pdf',
+      },
+    ],
   },
   {
     firstName: 'Emily',
@@ -64,8 +88,20 @@ const sampleInvestors = [
     streetAddress: '321 Cedar Lane',
     state: 'FL',
     zipCode: '33101',
-    filePath: '/uploads/sample/emily-rodriguez-id.pdf',
-    fileOriginalName: 'drivers-license.pdf',
+    files: [
+      {
+        filePath: '/uploads/sample/emily-rodriguez-id.pdf',
+        fileOriginalName: 'drivers-license.pdf',
+        fileSize: 278528,
+        mimeType: 'application/pdf',
+      },
+      {
+        filePath: '/uploads/sample/emily-rodriguez-utility.png',
+        fileOriginalName: 'utility-bill.png',
+        fileSize: 456789,
+        mimeType: 'image/png',
+      },
+    ],
   },
   {
     firstName: 'David',
@@ -75,8 +111,14 @@ const sampleInvestors = [
     streetAddress: '654 Birch Court',
     state: 'WA',
     zipCode: '98101',
-    filePath: '/uploads/sample/david-williams-id.pdf',
-    fileOriginalName: 'passport.pdf',
+    files: [
+      {
+        filePath: '/uploads/sample/david-williams-id.pdf',
+        fileOriginalName: 'passport.pdf',
+        fileSize: 334848,
+        mimeType: 'application/pdf',
+      },
+    ],
   },
 ];
 
@@ -102,11 +144,25 @@ async function main() {
   // Create investors
   for (const investor of sampleInvestors) {
     const created = await prisma.investor.create({
-      data: investor,
+      data: {
+        firstName: investor.firstName,
+        lastName: investor.lastName,
+        dateOfBirth: investor.dateOfBirth,
+        phoneNumber: investor.phoneNumber,
+        streetAddress: investor.streetAddress,
+        state: investor.state,
+        zipCode: investor.zipCode,
+        files: {
+          create: investor.files,
+        },
+      },
+      include: {
+        files: true,
+      },
     });
 
     console.log(
-      `✓ Created investor: ${created.firstName} ${created.lastName} (ID: ${created.id})`
+      `✓ Created investor: ${created.firstName} ${created.lastName} (ID: ${created.id}) with ${created.files.length} file(s)`
     );
   }
 
