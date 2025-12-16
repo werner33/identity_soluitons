@@ -31,12 +31,12 @@ It's a Next.js app collecting investor information. Each investor can upload 1 o
 ## Quick Start
 
 ```bash
-# 1. Install dependencies
-npm install
-
-# 2. Set up environment
+# 1. Set up environment
 cp .env.example .env
 # Edit .env and add your DATABASE_URL
+
+# 2. Install dependencies
+npm install
 
 # 3. Create database
 createdb investor_db
