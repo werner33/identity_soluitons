@@ -1,6 +1,32 @@
 # Investor Information Management System
 
-A professional, secure platform for managing investor information and documents built with Next.js 14+, TypeScript, Prisma, and Tailwind CSS.
+Hey! 👋
+
+Started this on Sunday but honestly was super tired from a long week, so I picked it up Monday after work and got it to a good place.
+
+It's a Next.js app for collecting and managing investor information with file uploads. Here's what I built:
+
+## What It Does
+
+**Front End:**
+- Clean Material UI form with first name, last name, birthday, phone number, street address, state, zip code, and **multiple file uploader**
+- Full validation on everything - phone must be valid US/Canada format, validates US zip codes, checks required fields, age restrictions (18-120), etc.
+- Fully responsive design that works on mobile, tablet, and desktop
+- Success toast notifications when you save data
+- Shows a list of files you're uploading with remove buttons
+
+**Back End:**
+- Same validations as the front end so there's no way to bypass and save invalid data
+- Database-level CHECK constraints for extra security
+- Normalizes phone numbers to 10 digits (strips all formatting before saving)
+- Handles multiple file uploads with individual file validation (max 3MB each)
+- Uses UUIDs instead of sequential IDs for better security
+
+**Database:**
+- PostgreSQL with Prisma ORM
+- Two tables: investors and investor_files (one-to-many relationship)
+- Built-in constraints to enforce data integrity
+- Proper indexing for performance
 
 ## Quick Start
 
@@ -10,7 +36,7 @@ npm install
 
 # 2. Set up environment
 cp .env.example .env
-# Edit .env and set your DATABASE_URL
+# Edit .env and add your DATABASE_URL
 
 # 3. Create database
 createdb investor_db
@@ -18,449 +44,242 @@ createdb investor_db
 # 4. Run migrations
 npm run db:migrate:dev
 
-# 5. Seed sample data
+# 5. Seed sample data (optional)
 npm run db:seed
 
-# 6. Start development server
+# 6. Start the app
 npm run dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000)
+Visit [http://localhost:3000](http://localhost:3000) and you're good to go!
+
+## Database Schema
+
+Here's how the data is structured:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      INVESTORS TABLE                             │
+├──────────────────┬──────────────┬─────────────────────────────────┤
+│ Column           │ Type         │ Constraints                     │
+├──────────────────┼──────────────┼─────────────────────────────────┤
+│ id               │ UUID         │ PRIMARY KEY                     │
+│ first_name       │ VARCHAR(100) │ NOT NULL, length 1-100         │
+│ last_name        │ VARCHAR(100) │ NOT NULL, length 1-100         │
+│ date_of_birth    │ DATE         │ NOT NULL, age 18-120           │
+│ phone_number     │ VARCHAR(10)  │ NOT NULL, exactly 10 digits    │
+│ street_address   │ VARCHAR(255) │ NOT NULL, length 1-255         │
+│ state            │ CHAR(2)      │ NOT NULL, valid US state       │
+│ zip_code         │ VARCHAR(10)  │ NOT NULL, valid US ZIP         │
+│ created_at       │ TIMESTAMPTZ  │ DEFAULT NOW()                  │
+│ updated_at       │ TIMESTAMPTZ  │ AUTO UPDATE                    │
+└──────────────────┴──────────────┴─────────────────────────────────┘
+                              ▲
+                              │
+                              │ (one-to-many)
+                              │
+┌─────────────────────────────┴───────────────────────────────────┐
+│                    INVESTOR_FILES TABLE                          │
+├──────────────────┬──────────────┬─────────────────────────────────┤
+│ Column           │ Type         │ Constraints                     │
+├──────────────────┼──────────────┼─────────────────────────────────┤
+│ id               │ UUID         │ PRIMARY KEY                     │
+│ investor_id      │ UUID         │ FOREIGN KEY → investors.id      │
+│ file_path        │ VARCHAR(500) │ NOT NULL                       │
+│ file_original_   │ VARCHAR(255) │ NOT NULL                       │
+│   name           │              │                                │
+│ file_size        │ INTEGER      │ NOT NULL                       │
+│ mime_type        │ VARCHAR(100) │ NOT NULL                       │
+│ created_at       │ TIMESTAMPTZ  │ DEFAULT NOW()                  │
+└──────────────────┴──────────────┴─────────────────────────────────┘
+
+Indexes:
+  investors:
+    - idx_investor_lastname_created (last_name, created_at)
+    - idx_investor_phone (phone_number)
+
+  investor_files:
+    - idx_investor_file_investor_id (investor_id)
+
+Constraints:
+  - Phone: must be exactly 10 digits (e.g., 9515267196)
+  - ZIP: 5 or 9 digit format, valid range 00501-99950
+  - Age: between 18 and 120 years old
+  - Names & address: cannot be empty or whitespace only
+  - Cascade delete: deleting an investor deletes all their files
+```
+
+## Three Layers of Validation
+
+I set up validation at every layer for security and data integrity:
+
+1. **Front-End (Zod)**: Immediate feedback to users, better UX
+2. **API Routes**: Server-side validation before processing
+3. **Database (CHECK Constraints)**: Final enforcement, can't be bypassed
+
+So even if someone tries to hit the API directly and skip the front-end, the data still gets validated before it hits the database.
 
 ## Tech Stack
 
-- **Frontend Framework**: Next.js 14+ (App Router)
+- **Framework**: Next.js 14+ (App Router)
 - **Language**: TypeScript
-- **Database**: PostgreSQL 14+ with Prisma ORM
+- **Database**: PostgreSQL 14+ with Prisma ORM v7
+- **UI Library**: Material UI
 - **Styling**: Tailwind CSS v4
-- **Code Quality**: ESLint, Prettier
-- **Font**: Inter (Google Fonts)
+- **Form Validation**: Zod + React Hook Form
+- **Code Quality**: ESLint + Prettier
 
-## Prerequisites
+## What You Need Installed
 
-Before you begin, ensure you have the following installed:
-
-- Node.js 18.x or higher
-- npm 9.x or higher
-- PostgreSQL 14+ (for database)
+- Node.js 18+
+- npm 9+
+- PostgreSQL 14+
 - Git
 
-## Installation
+## Setting Up PostgreSQL
 
-1. Clone the repository:
+If you don't have PostgreSQL installed:
 
+**macOS:**
 ```bash
-git clone <repository-url>
-cd identity-sol
-```
-
-2. Install dependencies:
-
-```bash
-npm install
-```
-
-This installs all required packages including:
-
-- Next.js 14+ and React 19
-- Prisma ORM with PostgreSQL adapter
-- Tailwind CSS v4
-- TypeScript and development tools
-
-3. Set up environment variables:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and configure the following variables:
-
-- `DATABASE_URL`: Your PostgreSQL connection string
-- `NODE_ENV`: Set to `development` or `production`
-- `NEXT_PUBLIC_APP_URL`: Your application URL
-- `MAX_FILE_SIZE`: Maximum file upload size (default: 3MB)
-- `UPLOAD_DIR`: Directory for file uploads (default: ./uploads)
-
-## Database Setup
-
-### Installing PostgreSQL
-
-#### macOS (using Homebrew)
-
-```bash
-# Install PostgreSQL
 brew install postgresql@14
-
-# Start PostgreSQL service
 brew services start postgresql@14
-
-# Verify installation
-psql --version
 ```
 
-#### Linux (Ubuntu/Debian)
-
+**Ubuntu/Debian:**
 ```bash
-# Install PostgreSQL
 sudo apt update
 sudo apt install postgresql postgresql-contrib
-
-# Start PostgreSQL service
 sudo systemctl start postgresql
-sudo systemctl enable postgresql
-
-# Verify installation
-psql --version
 ```
 
-#### Windows
+**Windows:**
+Download from [postgresql.org/download](https://www.postgresql.org/download/windows/)
 
-Download and install from [PostgreSQL Official Website](https://www.postgresql.org/download/windows/)
-
-### Creating the Database
-
-1. **Access PostgreSQL**:
-
+Then create the database:
 ```bash
-# macOS/Linux
+# Access PostgreSQL
 psql postgres
 
-# Or with specific user
-sudo -u postgres psql
-```
-
-2. **Create database and user**:
-
-```sql
--- Create the database
+# Create database
 CREATE DATABASE investor_db;
 
--- Create a user (optional, for production)
-CREATE USER investor_admin WITH PASSWORD 'secure_password';
-
--- Grant privileges
-GRANT ALL PRIVILEGES ON DATABASE investor_db TO investor_admin;
-
--- Exit
+# Exit
 \q
 ```
 
-3. **Verify database creation**:
+## Environment Variables
+
+Copy `.env.example` to `.env` and configure:
 
 ```bash
-psql -l  # List all databases
+# Your PostgreSQL connection
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/investor_db"
+
+# File upload settings (optional)
+MAX_FILE_SIZE=3145728  # 3MB
+UPLOAD_DIR=./uploads
+
+NODE_ENV=development
 ```
 
-### Database Schema
-
-The database uses the following schema:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    INVESTORS TABLE                       │
-├─────────────────────┬──────────────┬───────────────────┤
-│ Column              │ Type         │ Constraints       │
-├─────────────────────┼──────────────┼───────────────────┤
-│ id                  │ SERIAL       │ PRIMARY KEY       │
-│ first_name          │ VARCHAR(100) │ NOT NULL          │
-│ last_name           │ VARCHAR(100) │ NOT NULL          │
-│ date_of_birth       │ DATE         │ NOT NULL          │
-│ phone_number        │ VARCHAR(20)  │ NOT NULL          │
-│ street_address      │ VARCHAR(255) │ NOT NULL          │
-│ state               │ CHAR(2)      │ NOT NULL          │
-│ zip_code            │ VARCHAR(10)  │ NOT NULL          │
-│ file_path           │ VARCHAR(500) │ NOT NULL          │
-│ file_original_name  │ VARCHAR(255) │ NOT NULL          │
-│ created_at          │ TIMESTAMPTZ  │ DEFAULT NOW()     │
-│ updated_at          │ TIMESTAMPTZ  │ AUTO UPDATE       │
-└─────────────────────┴──────────────┴───────────────────┘
-
-Indexes:
-  - idx_investor_lastname_created (last_name, created_at)
-  - idx_investor_phone (phone_number)
-```
-
-### Running Migrations
-
-1. **Generate Prisma Client** (automatically runs on install):
+## Useful Commands
 
 ```bash
-npm run db:generate
-```
+# Development
+npm run dev              # Start dev server
+npm run build           # Production build
+npm start              # Run production build
 
-2. **Create and apply migrations**:
+# Database
+npm run db:studio       # Open Prisma Studio (GUI)
+npm run db:seed         # Add sample data
+npm run db:reset        # ⚠️  Reset database (deletes everything)
 
-```bash
-# Development: Create migration and apply
-npm run db:migrate:dev
-
-# You'll be prompted to name the migration
-# Example: "init" or "add_investors_table"
-```
-
-3. **Production deployment**:
-
-```bash
-# Apply migrations without prompts (for CI/CD)
-npm run db:migrate:deploy
-```
-
-4. **Alternative: Push schema without migrations** (for rapid prototyping):
-
-```bash
-npm run db:push
-```
-
-### Seeding the Database
-
-Populate the database with sample data:
-
-```bash
-npm run db:seed
-```
-
-This creates 5 sample investors with realistic data. The seed script is idempotent - it won't create duplicates if run multiple times.
-
-### Database Management
-
-```bash
-# Open Prisma Studio (GUI for database)
-npm run db:studio
-
-# Test database connection
-npm run db:test
-
-# Reset database (⚠️ WARNING: Deletes all data)
-npm run db:reset
-```
-
-## Running the Application
-
-### Development Mode
-
-Start the development server:
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Production Build
-
-Create an optimized production build:
-
-```bash
-npm run build
-npm start
-```
-
-### Other Commands
-
-```bash
-# Run ESLint
-npm run lint
-
-# Fix ESLint errors automatically
-npm run lint:fix
-
-# Format code with Prettier
-npm run format
-
-# Check code formatting
-npm run format:check
-
-# Type check TypeScript
-npm run type-check
+# Code Quality
+npm run lint            # Check for issues
+npm run format          # Format code with Prettier
+npm run type-check      # TypeScript validation
 ```
 
 ## Project Structure
 
 ```
 identity-sol/
-├── app/                    # Next.js App Router pages
-│   ├── layout.tsx         # Root layout with header/footer
-│   ├── page.tsx           # Home page
-│   └── globals.css        # Global styles and Tailwind config
-├── prisma/                # Database schema and migrations
-│   ├── schema.prisma      # Prisma schema definition
-│   ├── seed.ts           # Database seeding script
-│   └── migrations/        # Migration history
-├── components/            # Reusable React components
-├── lib/                   # Utility functions and helpers
-│   ├── db.ts             # Prisma client singleton
-│   └── db-utils.ts       # Database utilities and helpers
-├── types/                 # TypeScript type definitions
-│   └── investor.ts       # Investor types and validation
-├── uploads/               # File upload directory (git-ignored)
-├── public/                # Static assets
-├── .env.example          # Environment variable template
-├── .prettierrc           # Prettier configuration
-├── eslint.config.mjs     # ESLint configuration
-├── next.config.ts        # Next.js configuration
-└── tsconfig.json         # TypeScript configuration
+├── app/
+│   ├── api/investors/   # API endpoints for investor CRUD
+│   ├── layout.tsx       # Root layout with header/footer
+│   ├── page.tsx         # Home page with form
+│   └── globals.css      # Global styles
+├── components/
+│   └── InvestorForm.tsx # Main form component
+├── prisma/
+│   ├── schema.prisma    # Database schema
+│   ├── seed.ts          # Sample data
+│   └── migrations/      # Migration history
+├── lib/
+│   ├── db.ts           # Prisma client singleton
+│   └── db-utils.ts     # Database helpers
+├── uploads/            # File storage (git-ignored)
+└── .env.example        # Environment template
 ```
 
-### Directory Purposes
+## How File Uploads Work
 
-- **app/**: Contains all routes and pages using Next.js App Router
-- **prisma/**: Database schema, migrations, and seed scripts
-- **components/**: Reusable UI components
-- **lib/**: Server-side utilities, API helpers, database client, and shared functions
-- **types/**: TypeScript interfaces and type definitions
-- **uploads/**: Server-side file storage (not tracked in git)
-- **public/**: Static files served directly
+- Users can upload multiple files (PDF, JPG, PNG)
+- Each file is validated (type, size max 3MB)
+- Files are saved to `./uploads` with unique timestamped names
+- File metadata is stored in the `investor_files` table
+- The form shows a preview list of selected files with remove buttons
 
-## Database Troubleshooting
+## Sample Data
 
-### Common Issues and Solutions
+Run `npm run db:seed` to create 5 sample investors:
+- John Smith (California) - 2 files
+- Sarah Johnson (New York) - 1 file
+- Michael Chen (Texas) - 1 file
+- Emily Rodriguez (Florida) - 2 files
+- David Williams (Washington) - 1 file
 
-#### Connection Refused
+Phone numbers are stored as 10 digits (e.g., `9535550123`), but the form accepts formats like `1-951-555-0123` or `(951) 555-0123` and normalizes them automatically.
 
-**Error**: `Error: connect ECONNREFUSED 127.0.0.1:5432`
+## Common Issues
 
-**Solution**:
-
+**"Can't connect to database"**
 ```bash
-# Check if PostgreSQL is running
+# Make sure PostgreSQL is running
 brew services list  # macOS
 sudo systemctl status postgresql  # Linux
 
-# Start PostgreSQL if not running
-brew services start postgresql@14  # macOS
-sudo systemctl start postgresql  # Linux
+# Start it if needed
+brew services start postgresql@14
 ```
 
-#### Authentication Failed
-
-**Error**: `P1002: Authentication failed`
-
-**Solution**:
-
-- Verify your DATABASE_URL credentials in `.env`
-- Check PostgreSQL user permissions:
-
+**"Database investor_db does not exist"**
 ```bash
-psql postgres -c "\du"  # List all users and roles
-```
-
-#### Database Does Not Exist
-
-**Error**: `P1003: Database does not exist`
-
-**Solution**:
-
-```bash
-# Create the database
 createdb investor_db
-
-# Or via psql
-psql postgres -c "CREATE DATABASE investor_db;"
 ```
 
-#### Migration Failed
-
-**Error**: Migration conflicts or schema drift
-
-**Solution**:
-
+**"Prisma Client not found"**
 ```bash
-# Reset migrations (⚠️ WARNING: Deletes all data)
-npm run db:reset
-
-# Or manually resolve
-npm run db:push  # Push schema without migrations
-```
-
-#### Prisma Client Not Generated
-
-**Error**: `Cannot find module '@prisma/client'`
-
-**Solution**:
-
-```bash
-# Generate Prisma Client
 npm run db:generate
-
-# Or reinstall dependencies
-rm -rf node_modules
-npm install
 ```
 
-#### Port Already in Use
+## Security Features
 
-**Error**: PostgreSQL port 5432 already in use
-
-**Solution**:
-
-```bash
-# Find process using port 5432
-lsof -i :5432
-
-# Kill the process (replace PID)
-kill -9 <PID>
-
-# Or change port in DATABASE_URL
-# postgresql://user:password@localhost:5433/investor_db
-```
-
-### Connection String Examples
-
-```bash
-# Local development (default)
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/investor_db"
-
-# With custom user
-DATABASE_URL="postgresql://investor_admin:password@localhost:5432/investor_db"
-
-# Remote database with SSL
-DATABASE_URL="postgresql://user:password@db.example.com:5432/investor_db?sslmode=require"
-
-# Connection pooling (production)
-DATABASE_URL="postgresql://user:password@pooler.example.com:5432/investor_db?pgbouncer=true"
-
-# Unix socket
-DATABASE_URL="postgresql://user:password@/investor_db?host=/var/run/postgresql"
-```
-
-## Code Quality
-
-This project enforces code quality through:
-
-- **TypeScript**: Static type checking
-- **ESLint**: Code linting with Next.js recommended rules
-- **Prettier**: Consistent code formatting
-- **Prisma**: Type-safe database queries
-- All configured to work together seamlessly
-
-## Features
-
-- Modern Next.js 14+ App Router architecture
-- TypeScript for type safety
-- PostgreSQL database with Prisma ORM
-- Professional UI with Tailwind CSS
-- Dark mode support
-- Responsive design
-- File upload capability (configured for 3MB max)
-- Database migrations and seeding
-- Comprehensive error handling
-- SEO-friendly metadata
-- Performance optimized
+- UUIDs instead of sequential IDs (prevents enumeration attacks)
+- Phone numbers normalized to 10 digits only
+- Database-level constraints (can't be bypassed)
+- File type validation (PDF, JPG, PNG only)
+- File size limits (3MB per file)
+- No sensitive data in git (uploads folder is ignored)
 
 ## Contributing
 
-1. Create a feature branch
-2. Make your changes
-3. Run linting and formatting: `npm run lint && npm run format`
-4. Ensure type checking passes: `npm run type-check`
-5. Test database changes: `npm run db:test`
-6. Commit your changes
-7. Push and create a pull request
+1. Make your changes
+2. Run `npm run lint && npm run format`
+3. Check types with `npm run type-check`
+4. Make sure database works with `npm run db:test`
+5. Submit a PR
 
-## License
-
-[Add your license here]
-
-## Support
-
-For issues and questions, please [create an issue](https://github.com/your-repo/issues).
+That's it! Let me know if you run into any issues.
