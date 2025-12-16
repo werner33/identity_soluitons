@@ -12,11 +12,14 @@ export async function POST(request: NextRequest) {
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
     const dateOfBirth = formData.get('dateOfBirth') as string;
-    const phoneNumber = formData.get('phoneNumber') as string;
+    const phoneNumberRaw = formData.get('phoneNumber') as string;
     const streetAddress = formData.get('streetAddress') as string;
     const state = formData.get('state') as string;
     const zipCode = formData.get('zipCode') as string;
     const files = formData.getAll('files') as File[];
+
+    // Normalize phone number to 10 digits only (remove all non-digit characters)
+    const phoneNumber = phoneNumberRaw.replace(/\D/g, '');
 
     // Validate required fields
     if (
@@ -30,6 +33,102 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: 'All fields are required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate first name
+    if (firstName.trim().length < 1 || firstName.length > 100) {
+      return NextResponse.json(
+        { error: 'First name must be between 1 and 100 characters' },
+        { status: 400 }
+      );
+    }
+
+    // Validate last name
+    if (lastName.trim().length < 1 || lastName.length > 100) {
+      return NextResponse.json(
+        { error: 'Last name must be between 1 and 100 characters' },
+        { status: 400 }
+      );
+    }
+
+    // Validate street address
+    if (streetAddress.trim().length < 1 || streetAddress.length > 255) {
+      return NextResponse.json(
+        { error: 'Street address must be between 1 and 255 characters' },
+        { status: 400 }
+      );
+    }
+
+    // Validate state
+    if (state.length !== 2) {
+      return NextResponse.json(
+        { error: 'State must be a valid 2-letter state code' },
+        { status: 400 }
+      );
+    }
+
+    // Validate state is a valid US state code
+    const validStates = [
+      'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+      'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+      'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+      'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+      'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'
+    ];
+    if (!validStates.includes(state.toUpperCase())) {
+      return NextResponse.json(
+        { error: 'Invalid US state code' },
+        { status: 400 }
+      );
+    }
+
+    // Validate ZIP code format
+    const zipRegex = /^\d{5}(-\d{4})?$/;
+    if (!zipRegex.test(zipCode)) {
+      return NextResponse.json(
+        {
+          error:
+            'Invalid ZIP code format. Must be 5 digits (e.g., 12345) or 9 digits (e.g., 12345-6789)',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate ZIP code range
+    const zipNum = parseInt(zipCode.split('-')[0], 10);
+    if (zipNum < 501 || zipNum > 99950) {
+      return NextResponse.json(
+        { error: 'ZIP code must be a valid US ZIP code (00501-99950)' },
+        { status: 400 }
+      );
+    }
+
+    // Validate date of birth (age 18-120)
+    const dob = new Date(dateOfBirth);
+    const now = new Date();
+    const age = now.getFullYear() - dob.getFullYear();
+    const monthDiff = now.getMonth() - dob.getMonth();
+    const dayDiff = now.getDate() - dob.getDate();
+
+    // Adjust age if birthday hasn't occurred this year
+    const actualAge =
+      monthDiff < 0 || (monthDiff === 0 && dayDiff < 0) ? age - 1 : age;
+
+    if (actualAge < 18 || actualAge > 120) {
+      return NextResponse.json(
+        { error: 'Age must be between 18 and 120 years' },
+        { status: 400 }
+      );
+    }
+
+    // Validate phone number is exactly 10 digits
+    if (phoneNumber.length !== 10) {
+      return NextResponse.json(
+        {
+          error: 'Phone number must be exactly 10 digits',
+        },
         { status: 400 }
       );
     }
