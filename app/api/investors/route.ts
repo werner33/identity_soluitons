@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 import { db } from '@/lib/db';
 import { parsePrismaError } from '@/lib/db-utils';
 import { validateInvestorData } from '@/lib/investor-validation';
+import { uploadFiles } from '@/lib/file-upload';
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,48 +42,8 @@ export async function POST(request: NextRequest) {
     // Use validated and normalized data
     const validatedData = validation.data!;
 
-    // Create upload directory if it doesn't exist
-    const uploadDir = process.env.UPLOAD_DIR || './uploads';
-    const uploadPath = join(process.cwd(), uploadDir);
-
-    try {
-      await mkdir(uploadPath, { recursive: true });
-    } catch (error) {
-      console.error('Failed to create upload directory:', error);
-    }
-
-    // Prepare file data for saving
-    const fileDataArray = [];
-    for (const file of validatedData.files) {
-      const timestamp = Date.now();
-      const randomSuffix = Math.random().toString(36).substring(2, 8);
-      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const fileName = `${timestamp}-${randomSuffix}-${sanitizedFileName}`;
-      const filePath = join(uploadPath, fileName);
-      const dbFilePath = `${uploadDir}/${fileName}`;
-
-      // Validate file path length (database limit is 500 chars)
-      if (dbFilePath.length > 500) {
-        return NextResponse.json(
-          {
-            error: `File name "${file.name}" results in a path that is too long. Please use a shorter filename.`,
-          },
-          { status: 400 }
-        );
-      }
-
-      // Save file
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      await writeFile(filePath, buffer);
-
-      fileDataArray.push({
-        filePath: dbFilePath,
-        fileOriginalName: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-      });
-    }
+    // Upload files and get metadata
+    const fileDataArray = await uploadFiles(validatedData.files);
 
     // Save to database with files
     const investor = await db.investor.create({
