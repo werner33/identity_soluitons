@@ -1,9 +1,23 @@
 import { Investor, Prisma } from '@prisma/client';
+import {
+  FIELD_LENGTHS,
+  AGE_CONSTRAINTS,
+  ERROR_MESSAGES,
+  isValidStateCode,
+  calculateAge,
+  isValidZipRange,
+  ZIP_VALIDATION,
+} from '@/lib/validation-constants';
 
 /**
  * Re-export Prisma generated types
  */
 export type { Investor } from '@prisma/client';
+
+/**
+ * Re-export validation utilities
+ */
+export { isValidStateCode } from '@/lib/validation-constants';
 
 /**
  * Form data type for creating/updating investors
@@ -17,24 +31,15 @@ export interface InvestorFormData {
   streetAddress: string;
   state: string;
   zipCode: string;
-  file?: File; // File object from form input
+  files: FileList | File[]; // Multiple files supported
 }
-
-/**
- * Investor without file information
- * Used for API responses where file details aren't needed
- */
-export type InvestorWithoutFile = Omit<
-  Investor,
-  'filePath' | 'fileOriginalName'
->;
 
 /**
  * Investor with only essential information
  * Used for list views and summaries
  */
 export interface InvestorSummary {
-  id: number;
+  id: string; // UUID
   firstName: string;
   lastName: string;
   phoneNumber: string;
@@ -50,12 +55,16 @@ export interface CreateInvestorInput {
   firstName: string;
   lastName: string;
   dateOfBirth: Date;
-  phoneNumber: string;
+  phoneNumber: string; // Normalized to 10 digits
   streetAddress: string;
-  state: string;
+  state: string; // 2-letter state code
   zipCode: string;
-  filePath: string;
-  fileOriginalName: string;
+  files: Array<{
+    filePath: string;
+    fileOriginalName: string;
+    fileSize: number;
+    mimeType: string;
+  }>;
 }
 
 /**
@@ -63,16 +72,14 @@ export interface CreateInvestorInput {
  * All fields are optional except id
  */
 export interface UpdateInvestorInput {
-  id: number;
+  id: string; // UUID
   firstName?: string;
   lastName?: string;
   dateOfBirth?: Date;
-  phoneNumber?: string;
-  streetAddress: string;
-  state?: string;
+  phoneNumber?: string; // Normalized to 10 digits
+  streetAddress?: string;
+  state?: string; // 2-letter state code
   zipCode?: string;
-  filePath?: string;
-  fileOriginalName?: string;
 }
 
 /**
@@ -131,74 +138,11 @@ export interface InvestorListResponse {
 }
 
 /**
- * Type guard to check if a value is a valid US state code
- */
-export function isValidStateCode(state: string): boolean {
-  const validStates = [
-    'AL',
-    'AK',
-    'AZ',
-    'AR',
-    'CA',
-    'CO',
-    'CT',
-    'DE',
-    'FL',
-    'GA',
-    'HI',
-    'ID',
-    'IL',
-    'IN',
-    'IA',
-    'KS',
-    'KY',
-    'LA',
-    'ME',
-    'MD',
-    'MA',
-    'MI',
-    'MN',
-    'MS',
-    'MO',
-    'MT',
-    'NE',
-    'NV',
-    'NH',
-    'NJ',
-    'NM',
-    'NY',
-    'NC',
-    'ND',
-    'OH',
-    'OK',
-    'OR',
-    'PA',
-    'RI',
-    'SC',
-    'SD',
-    'TN',
-    'TX',
-    'UT',
-    'VT',
-    'VA',
-    'WA',
-    'WV',
-    'WI',
-    'WY',
-    'DC',
-  ];
-  return validStates.includes(state.toUpperCase());
-}
-
-/**
  * Type guard to check if dateOfBirth is valid (not in future, reasonable age)
  */
-export function isValidDateOfBirth(date: Date): boolean {
-  const now = new Date();
-  const minDate = new Date();
-  minDate.setFullYear(now.getFullYear() - 120); // Max age 120 years
-
-  return date <= now && date >= minDate;
+export function isValidDateOfBirth(date: Date | string): boolean {
+  const age = calculateAge(typeof date === 'string' ? date : date.toISOString());
+  return age >= AGE_CONSTRAINTS.MIN && age <= AGE_CONSTRAINTS.MAX;
 }
 
 /**
@@ -219,56 +163,67 @@ export function validateInvestorFormData(
 
   // First name validation
   if (!data.firstName || data.firstName.trim().length === 0) {
-    errors.firstName = 'First name is required';
-  } else if (data.firstName.length > 100) {
-    errors.firstName = 'First name must be 100 characters or less';
+    errors.firstName = ERROR_MESSAGES.FIRST_NAME_REQUIRED;
+  } else if (
+    data.firstName.trim().length < FIELD_LENGTHS.FIRST_NAME_MIN ||
+    data.firstName.length > FIELD_LENGTHS.FIRST_NAME_MAX
+  ) {
+    errors.firstName = ERROR_MESSAGES.FIRST_NAME_LENGTH;
   }
 
   // Last name validation
   if (!data.lastName || data.lastName.trim().length === 0) {
-    errors.lastName = 'Last name is required';
-  } else if (data.lastName.length > 100) {
-    errors.lastName = 'Last name must be 100 characters or less';
+    errors.lastName = ERROR_MESSAGES.LAST_NAME_REQUIRED;
+  } else if (
+    data.lastName.trim().length < FIELD_LENGTHS.LAST_NAME_MIN ||
+    data.lastName.length > FIELD_LENGTHS.LAST_NAME_MAX
+  ) {
+    errors.lastName = ERROR_MESSAGES.LAST_NAME_LENGTH;
   }
 
   // Date of birth validation
   if (!data.dateOfBirth) {
-    errors.dateOfBirth = 'Date of birth is required';
+    errors.dateOfBirth = ERROR_MESSAGES.DATE_OF_BIRTH_REQUIRED;
   } else {
     const dob = new Date(data.dateOfBirth);
     if (isNaN(dob.getTime())) {
       errors.dateOfBirth = 'Invalid date format';
     } else if (!isValidDateOfBirth(dob)) {
-      errors.dateOfBirth = 'Invalid date of birth';
+      errors.dateOfBirth = ERROR_MESSAGES.AGE_RANGE;
     }
   }
 
   // Phone number validation
   if (!data.phoneNumber || data.phoneNumber.trim().length === 0) {
-    errors.phoneNumber = 'Phone number is required';
-  } else if (data.phoneNumber.length > 20) {
-    errors.phoneNumber = 'Phone number must be 20 characters or less';
+    errors.phoneNumber = ERROR_MESSAGES.PHONE_REQUIRED;
   }
 
   // Street address validation
   if (!data.streetAddress || data.streetAddress.trim().length === 0) {
-    errors.streetAddress = 'Street address is required';
-  } else if (data.streetAddress.length > 255) {
-    errors.streetAddress = 'Street address must be 255 characters or less';
+    errors.streetAddress = ERROR_MESSAGES.STREET_ADDRESS_REQUIRED;
+  } else if (
+    data.streetAddress.trim().length < FIELD_LENGTHS.STREET_ADDRESS_MIN ||
+    data.streetAddress.length > FIELD_LENGTHS.STREET_ADDRESS_MAX
+  ) {
+    errors.streetAddress = ERROR_MESSAGES.STREET_ADDRESS_LENGTH;
   }
 
   // State validation
   if (!data.state || data.state.trim().length === 0) {
-    errors.state = 'State is required';
+    errors.state = ERROR_MESSAGES.STATE_REQUIRED;
+  } else if (data.state.length !== FIELD_LENGTHS.STATE_LENGTH) {
+    errors.state = ERROR_MESSAGES.STATE_LENGTH;
   } else if (!isValidStateCode(data.state)) {
-    errors.state = 'Invalid state code';
+    errors.state = ERROR_MESSAGES.STATE_INVALID;
   }
 
   // Zip code validation
   if (!data.zipCode || data.zipCode.trim().length === 0) {
-    errors.zipCode = 'Zip code is required';
-  } else if (data.zipCode.length > 10) {
-    errors.zipCode = 'Zip code must be 10 characters or less';
+    errors.zipCode = ERROR_MESSAGES.ZIP_REQUIRED;
+  } else if (!ZIP_VALIDATION.REGEX.test(data.zipCode)) {
+    errors.zipCode = ERROR_MESSAGES.ZIP_FORMAT;
+  } else if (!isValidZipRange(data.zipCode)) {
+    errors.zipCode = ERROR_MESSAGES.ZIP_RANGE;
   }
 
   return {

@@ -3,6 +3,19 @@
  * Provides comprehensive validation matching front-end rules
  */
 
+import {
+  US_STATES_LIST,
+  FILE_VALIDATION,
+  FIELD_LENGTHS,
+  AGE_CONSTRAINTS,
+  ZIP_VALIDATION,
+  ERROR_MESSAGES,
+  normalizePhoneNumber,
+  calculateAge,
+  isValidZipRange,
+  isValidStateCode,
+} from '@/lib/validation-constants';
+
 export interface InvestorValidationData {
   firstName: string;
   lastName: string;
@@ -35,99 +48,20 @@ export interface ValidationResult {
 }
 
 /**
- * Valid US state codes
- */
-const VALID_STATES = [
-  'AL',
-  'AK',
-  'AZ',
-  'AR',
-  'CA',
-  'CO',
-  'CT',
-  'DE',
-  'FL',
-  'GA',
-  'HI',
-  'ID',
-  'IL',
-  'IN',
-  'IA',
-  'KS',
-  'KY',
-  'LA',
-  'ME',
-  'MD',
-  'MA',
-  'MI',
-  'MN',
-  'MS',
-  'MO',
-  'MT',
-  'NE',
-  'NV',
-  'NH',
-  'NJ',
-  'NM',
-  'NY',
-  'NC',
-  'ND',
-  'OH',
-  'OK',
-  'OR',
-  'PA',
-  'RI',
-  'SC',
-  'SD',
-  'TN',
-  'TX',
-  'UT',
-  'VT',
-  'VA',
-  'WA',
-  'WV',
-  'WI',
-  'WY',
-  'DC',
-];
-
-/**
- * Allowed file MIME types
- */
-const ALLOWED_FILE_TYPES = [
-  'application/pdf',
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-];
-
-/**
- * Maximum file size (3MB)
- */
-const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '3145728', 10);
-
-/**
- * Normalize phone number to 10 digits only
- */
-function normalizePhoneNumber(phoneNumber: string): string {
-  return phoneNumber.replace(/\D/g, '');
-}
-
-/**
  * Validate first name
  */
 function validateFirstName(firstName: string): ValidationError[] {
   const errors: ValidationError[] = [];
 
   if (!firstName?.trim()) {
-    errors.push({ field: 'firstName', message: 'First name is required' });
+    errors.push({ field: 'firstName', message: ERROR_MESSAGES.FIRST_NAME_REQUIRED });
     return errors;
   }
 
-  if (firstName.trim().length < 1 || firstName.length > 100) {
+  if (firstName.trim().length < FIELD_LENGTHS.FIRST_NAME_MIN || firstName.length > FIELD_LENGTHS.FIRST_NAME_MAX) {
     errors.push({
       field: 'firstName',
-      message: 'First name must be between 1 and 100 characters',
+      message: ERROR_MESSAGES.FIRST_NAME_LENGTH,
     });
   }
 
@@ -141,14 +75,14 @@ function validateLastName(lastName: string): ValidationError[] {
   const errors: ValidationError[] = [];
 
   if (!lastName?.trim()) {
-    errors.push({ field: 'lastName', message: 'Last name is required' });
+    errors.push({ field: 'lastName', message: ERROR_MESSAGES.LAST_NAME_REQUIRED });
     return errors;
   }
 
-  if (lastName.trim().length < 1 || lastName.length > 100) {
+  if (lastName.trim().length < FIELD_LENGTHS.LAST_NAME_MIN || lastName.length > FIELD_LENGTHS.LAST_NAME_MAX) {
     errors.push({
       field: 'lastName',
-      message: 'Last name must be between 1 and 100 characters',
+      message: ERROR_MESSAGES.LAST_NAME_LENGTH,
     });
   }
 
@@ -164,15 +98,15 @@ function validateStreetAddress(streetAddress: string): ValidationError[] {
   if (!streetAddress?.trim()) {
     errors.push({
       field: 'streetAddress',
-      message: 'Street address is required',
+      message: ERROR_MESSAGES.STREET_ADDRESS_REQUIRED,
     });
     return errors;
   }
 
-  if (streetAddress.trim().length < 1 || streetAddress.length > 255) {
+  if (streetAddress.trim().length < FIELD_LENGTHS.STREET_ADDRESS_MIN || streetAddress.length > FIELD_LENGTHS.STREET_ADDRESS_MAX) {
     errors.push({
       field: 'streetAddress',
-      message: 'Street address must be between 1 and 255 characters',
+      message: ERROR_MESSAGES.STREET_ADDRESS_LENGTH,
     });
   }
 
@@ -186,20 +120,20 @@ function validateState(state: string): ValidationError[] {
   const errors: ValidationError[] = [];
 
   if (!state) {
-    errors.push({ field: 'state', message: 'State is required' });
+    errors.push({ field: 'state', message: ERROR_MESSAGES.STATE_REQUIRED });
     return errors;
   }
 
-  if (state.length !== 2) {
+  if (state.length !== FIELD_LENGTHS.STATE_LENGTH) {
     errors.push({
       field: 'state',
-      message: 'State must be a valid 2-letter state code',
+      message: ERROR_MESSAGES.STATE_LENGTH,
     });
     return errors;
   }
 
-  if (!VALID_STATES.includes(state.toUpperCase())) {
-    errors.push({ field: 'state', message: 'Invalid US state code' });
+  if (!isValidStateCode(state)) {
+    errors.push({ field: 'state', message: ERROR_MESSAGES.STATE_INVALID });
   }
 
   return errors;
@@ -212,25 +146,22 @@ function validateZipCode(zipCode: string): ValidationError[] {
   const errors: ValidationError[] = [];
 
   if (!zipCode) {
-    errors.push({ field: 'zipCode', message: 'ZIP code is required' });
+    errors.push({ field: 'zipCode', message: ERROR_MESSAGES.ZIP_REQUIRED });
     return errors;
   }
 
-  const zipRegex = /^\d{5}(-\d{4})?$/;
-  if (!zipRegex.test(zipCode)) {
+  if (!ZIP_VALIDATION.REGEX.test(zipCode)) {
     errors.push({
       field: 'zipCode',
-      message:
-        'Invalid ZIP code format. Must be 5 digits (e.g., 12345) or 9 digits (e.g., 12345-6789)',
+      message: ERROR_MESSAGES.ZIP_FORMAT,
     });
     return errors;
   }
 
-  const zipNum = parseInt(zipCode.split('-')[0], 10);
-  if (zipNum < 501 || zipNum > 99950) {
+  if (!isValidZipRange(zipCode)) {
     errors.push({
       field: 'zipCode',
-      message: 'ZIP code must be a valid US ZIP code (00501-99950)',
+      message: ERROR_MESSAGES.ZIP_RANGE,
     });
   }
 
@@ -244,24 +175,16 @@ function validateDateOfBirth(dateOfBirth: string): ValidationError[] {
   const errors: ValidationError[] = [];
 
   if (!dateOfBirth) {
-    errors.push({ field: 'dateOfBirth', message: 'Date of birth is required' });
+    errors.push({ field: 'dateOfBirth', message: ERROR_MESSAGES.DATE_OF_BIRTH_REQUIRED });
     return errors;
   }
 
-  const dob = new Date(dateOfBirth);
-  const now = new Date();
-  const age = now.getFullYear() - dob.getFullYear();
-  const monthDiff = now.getMonth() - dob.getMonth();
-  const dayDiff = now.getDate() - dob.getDate();
+  const age = calculateAge(dateOfBirth);
 
-  // Adjust age if birthday hasn't occurred this year
-  const actualAge =
-    monthDiff < 0 || (monthDiff === 0 && dayDiff < 0) ? age - 1 : age;
-
-  if (actualAge < 18 || actualAge > 120) {
+  if (age < AGE_CONSTRAINTS.MIN || age > AGE_CONSTRAINTS.MAX) {
     errors.push({
       field: 'dateOfBirth',
-      message: 'Age must be between 18 and 120 years',
+      message: ERROR_MESSAGES.AGE_RANGE,
     });
   }
 
@@ -276,14 +199,14 @@ function validatePhoneNumber(phoneNumber: string): ValidationError[] {
   const normalized = normalizePhoneNumber(phoneNumber);
 
   if (!normalized) {
-    errors.push({ field: 'phoneNumber', message: 'Phone number is required' });
+    errors.push({ field: 'phoneNumber', message: ERROR_MESSAGES.PHONE_REQUIRED });
     return errors;
   }
 
-  if (normalized.length !== 10) {
+  if (normalized.length !== FIELD_LENGTHS.PHONE_LENGTH) {
     errors.push({
       field: 'phoneNumber',
-      message: 'Phone number must be exactly 10 digits',
+      message: ERROR_MESSAGES.PHONE_LENGTH,
     });
   }
 
@@ -297,36 +220,36 @@ function validateFiles(files: File[]): ValidationError[] {
   const errors: ValidationError[] = [];
 
   if (!files || files.length === 0) {
-    errors.push({ field: 'files', message: 'At least one file is required' });
+    errors.push({ field: 'files', message: ERROR_MESSAGES.FILES_REQUIRED });
     return errors;
   }
 
   for (const file of files) {
-    if (file.size > MAX_FILE_SIZE) {
+    if (file.size > FILE_VALIDATION.MAX_SIZE) {
       errors.push({
         field: 'files',
-        message: `File "${file.name}" exceeds maximum allowed size (3MB)`,
+        message: ERROR_MESSAGES.FILE_SIZE(file.name),
       });
     }
 
-    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+    if (!FILE_VALIDATION.ALLOWED_TYPES.includes(file.type as typeof FILE_VALIDATION.ALLOWED_TYPES[number])) {
       errors.push({
         field: 'files',
-        message: `File "${file.name}" has invalid type. Only PDF, JPG, and PNG are allowed`,
+        message: ERROR_MESSAGES.FILE_TYPE(file.name),
       });
     }
 
-    if (file.name.length > 255) {
+    if (file.name.length > FILE_VALIDATION.MAX_FILENAME_LENGTH) {
       errors.push({
         field: 'files',
-        message: `File name "${file.name}" is too long. Maximum 255 characters allowed.`,
+        message: ERROR_MESSAGES.FILE_NAME_LENGTH(file.name),
       });
     }
 
-    if (file.type.length > 100) {
+    if (file.type.length > FILE_VALIDATION.MAX_MIME_TYPE_LENGTH) {
       errors.push({
         field: 'files',
-        message: `File "${file.name}" has an invalid mime type.`,
+        message: ERROR_MESSAGES.FILE_MIME_TYPE(file.name),
       });
     }
   }

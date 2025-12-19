@@ -4,91 +4,34 @@
  */
 
 import { z } from 'zod';
+import {
+  US_STATES,
+  FILE_VALIDATION,
+  FIELD_LENGTHS,
+  AGE_CONSTRAINTS,
+  PHONE_VALIDATION,
+  ZIP_VALIDATION,
+  calculateAge,
+  isValidZipRange,
+} from '@/lib/validation-constants';
 
-/**
- * US States for dropdown selection
- */
-export const US_STATES = [
-  { value: 'AL', label: 'Alabama' },
-  { value: 'AK', label: 'Alaska' },
-  { value: 'AZ', label: 'Arizona' },
-  { value: 'AR', label: 'Arkansas' },
-  { value: 'CA', label: 'California' },
-  { value: 'CO', label: 'Colorado' },
-  { value: 'CT', label: 'Connecticut' },
-  { value: 'DE', label: 'Delaware' },
-  { value: 'FL', label: 'Florida' },
-  { value: 'GA', label: 'Georgia' },
-  { value: 'HI', label: 'Hawaii' },
-  { value: 'ID', label: 'Idaho' },
-  { value: 'IL', label: 'Illinois' },
-  { value: 'IN', label: 'Indiana' },
-  { value: 'IA', label: 'Iowa' },
-  { value: 'KS', label: 'Kansas' },
-  { value: 'KY', label: 'Kentucky' },
-  { value: 'LA', label: 'Louisiana' },
-  { value: 'ME', label: 'Maine' },
-  { value: 'MD', label: 'Maryland' },
-  { value: 'MA', label: 'Massachusetts' },
-  { value: 'MI', label: 'Michigan' },
-  { value: 'MN', label: 'Minnesota' },
-  { value: 'MS', label: 'Mississippi' },
-  { value: 'MO', label: 'Missouri' },
-  { value: 'MT', label: 'Montana' },
-  { value: 'NE', label: 'Nebraska' },
-  { value: 'NV', label: 'Nevada' },
-  { value: 'NH', label: 'New Hampshire' },
-  { value: 'NJ', label: 'New Jersey' },
-  { value: 'NM', label: 'New Mexico' },
-  { value: 'NY', label: 'New York' },
-  { value: 'NC', label: 'North Carolina' },
-  { value: 'ND', label: 'North Dakota' },
-  { value: 'OH', label: 'Ohio' },
-  { value: 'OK', label: 'Oklahoma' },
-  { value: 'OR', label: 'Oregon' },
-  { value: 'PA', label: 'Pennsylvania' },
-  { value: 'RI', label: 'Rhode Island' },
-  { value: 'SC', label: 'South Carolina' },
-  { value: 'SD', label: 'South Dakota' },
-  { value: 'TN', label: 'Tennessee' },
-  { value: 'TX', label: 'Texas' },
-  { value: 'UT', label: 'Utah' },
-  { value: 'VT', label: 'Vermont' },
-  { value: 'VA', label: 'Virginia' },
-  { value: 'WA', label: 'Washington' },
-  { value: 'WV', label: 'West Virginia' },
-  { value: 'WI', label: 'Wisconsin' },
-  { value: 'WY', label: 'Wyoming' },
-  { value: 'DC', label: 'District of Columbia' },
-];
-
-/**
- * Validation constants
- */
-const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB
-
-const ALLOWED_FILE_TYPES = [
-  'application/pdf',
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-];
+export { US_STATES };
 
 /**
  * First name validation schema
  */
 const firstNameSchema = z
   .string()
-  .min(1, 'First name is required')
-  .max(100, 'First name must be 100 characters or less');
+  .min(FIELD_LENGTHS.FIRST_NAME_MIN, 'First name is required')
+  .max(FIELD_LENGTHS.FIRST_NAME_MAX, 'First name must be 100 characters or less');
 
 /**
  * Last name validation schema
  */
 const lastNameSchema = z
   .string()
-  .min(1, 'Last name is required')
-  .max(100, 'Last name must be 100 characters or less');
+  .min(FIELD_LENGTHS.LAST_NAME_MIN, 'Last name is required')
+  .max(FIELD_LENGTHS.LAST_NAME_MAX, 'Last name must be 100 characters or less');
 
 /**
  * Date of birth validation schema
@@ -98,10 +41,8 @@ const dateOfBirthSchema = z
   .string()
   .min(1, 'Date of birth is required')
   .refine((date) => {
-    const dob = new Date(date);
-    const now = new Date();
-    const age = now.getFullYear() - dob.getFullYear();
-    return age >= 18 && age <= 120;
+    const age = calculateAge(date);
+    return age >= AGE_CONSTRAINTS.MIN && age <= AGE_CONSTRAINTS.MAX;
   }, 'Must be between 18 and 120 years old');
 
 /**
@@ -112,8 +53,8 @@ const phoneNumberSchema = z
   .string()
   .min(1, 'Phone number is required')
   .regex(
-    /^(\+?1[-.\s]?)?\(?([2-9][0-9]{2})\)?[-.\s]?([2-9][0-9]{2})[-.\s]?([0-9]{4})$/,
-    'Invalid phone number. Format: 1-951-526-3834 or (951) 526-3834'
+    PHONE_VALIDATION.REGEX,
+    `Invalid phone number. Format: ${PHONE_VALIDATION.FORMAT_EXAMPLE}`
   );
 
 /**
@@ -121,14 +62,14 @@ const phoneNumberSchema = z
  */
 const streetAddressSchema = z
   .string()
-  .min(1, 'Street address is required')
-  .max(255, 'Street address must be 255 characters or less');
+  .min(FIELD_LENGTHS.STREET_ADDRESS_MIN, 'Street address is required')
+  .max(FIELD_LENGTHS.STREET_ADDRESS_MAX, 'Street address must be 255 characters or less');
 
 /**
  * State validation schema
  * Must be 2-letter US state code
  */
-const stateSchema = z.string().length(2, 'Please select a state');
+const stateSchema = z.string().length(FIELD_LENGTHS.STATE_LENGTH, 'Please select a state');
 
 /**
  * ZIP code validation schema
@@ -139,15 +80,13 @@ const zipCodeSchema = z
   .string()
   .min(1, 'ZIP code is required')
   .regex(
-    /^\d{5}(-\d{4})?$/,
-    'Invalid ZIP code. Must be 5 digits (e.g., 12345) or 9 digits (e.g., 12345-6789)'
+    ZIP_VALIDATION.REGEX,
+    `Invalid ZIP code. Must be ${ZIP_VALIDATION.FORMAT_EXAMPLE}`
   )
-  .refine((zip) => {
-    const zipOnly = zip.split('-')[0];
-    const zipNum = parseInt(zipOnly, 10);
-    // Valid US ZIP codes range from 00501 to 99950
-    return zipNum >= 501 && zipNum <= 99950;
-  }, 'Invalid US ZIP code');
+  .refine(
+    (zip) => isValidZipRange(zip),
+    'Invalid US ZIP code'
+  );
 
 /**
  * Files validation schema
@@ -164,7 +103,7 @@ const filesSchema = z
     (files) => {
       if (!(files instanceof FileList)) return false;
       for (let i = 0; i < files.length; i++) {
-        if (files[i].size > MAX_FILE_SIZE) return false;
+        if (files[i].size > FILE_VALIDATION.MAX_SIZE) return false;
       }
       return true;
     },
@@ -176,7 +115,7 @@ const filesSchema = z
     (files) => {
       if (!(files instanceof FileList)) return false;
       for (let i = 0; i < files.length; i++) {
-        if (!ALLOWED_FILE_TYPES.includes(files[i].type)) return false;
+        if (!FILE_VALIDATION.ALLOWED_TYPES.includes(files[i].type as typeof FILE_VALIDATION.ALLOWED_TYPES[number])) return false;
       }
       return true;
     },
