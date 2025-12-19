@@ -2,7 +2,10 @@
  * File upload utilities for handling investor file uploads
  */
 
-import { writeFile, mkdir } from 'fs/promises';
+import { mkdir } from 'fs/promises';
+import { createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
+import { Readable } from 'stream';
 import { join } from 'path';
 
 export interface FileUploadResult {
@@ -15,6 +18,29 @@ export interface FileUploadResult {
 export interface UploadConfig {
   uploadDir?: string;
   maxPathLength?: number;
+}
+
+/**
+ * Convert Web ReadableStream to Node.js Readable stream
+ * Web File API returns ReadableStream, but Node.js pipeline expects Readable
+ */
+function webStreamToNodeStream(webStream: ReadableStream): Readable {
+  const reader = webStream.getReader();
+
+  return new Readable({
+    async read() {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          this.push(null);
+        } else {
+          this.push(Buffer.from(value));
+        }
+      } catch (error) {
+        this.destroy(error as Error);
+      }
+    },
+  });
 }
 
 /**
@@ -53,7 +79,9 @@ export async function ensureUploadDirectory(
 }
 
 /**
- * Save a single file to disk
+ * Save a single file to disk using streaming
+ * Uses streaming instead of loading entire file into memory for better performance
+ * and to avoid memory issues with large files or concurrent uploads (critical for serverless)
  */
 async function saveFileToDisk(
   file: File,
@@ -61,9 +89,14 @@ async function saveFileToDisk(
   filename: string
 ): Promise<void> {
   const filePath = join(uploadPath, filename);
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  await writeFile(filePath, buffer);
+
+  // Convert Web ReadableStream to Node.js Readable stream
+  const webStream = file.stream();
+  const nodeStream = webStreamToNodeStream(webStream);
+  const writeStream = createWriteStream(filePath);
+
+  // Stream file directly to disk with automatic cleanup
+  await pipeline(nodeStream, writeStream);
 }
 
 /**
